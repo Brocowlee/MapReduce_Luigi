@@ -1,8 +1,5 @@
 # map-reduce.py
-from datetime import timedelta
-from time import sleep
 import luigi
-import os
 
 class InputData(luigi.ExternalTask):
     filename = luigi.Parameter()
@@ -30,7 +27,7 @@ class Spliter(luigi.Task):
         return InputData(filename=self.filename)
 
     def output(self):
-        return luigi.LocalTarget('./data/splited/split_output_{}.txt'.format(self.mapperNum))
+        return luigi.LocalTarget('/app/data/splited/split_output_{}.txt'.format(self.mapperNum))
 
     def run(self):
         self.output().makedirs()
@@ -53,7 +50,7 @@ class Mapper(luigi.Task):
         return Spliter(mapperNum=self.mapperNum, nb_of_mapper=self.nb_of_mapper, filename=self.filename)
 
     def output(self):
-        return luigi.LocalTarget('./data/maped/mapped_output_{}.txt'.format(self.mapperNum))
+        return luigi.LocalTarget('/app/data/maped/mapped_output_{}.txt'.format(self.mapperNum))
 
     def map_function(self, line):
         words = line.strip().split()
@@ -80,7 +77,7 @@ class Shuffler(luigi.Task):
             yield Mapper(mapperNum=mapperNum, filename=self.filename,nb_of_mapper=self.nb_of_mapper)
 
     def output(self):
-        return luigi.LocalTarget('./data/shuffled/shuffled_output_{}.txt'.format(self.reducerNum))
+        return luigi.LocalTarget('/app/data/shuffled/shuffled_output_{}.txt'.format(self.reducerNum))
 
     def run(self):
         self.output().makedirs()
@@ -105,7 +102,7 @@ class Reducer(luigi.Task):
         return Shuffler(nb_of_reducer=self.nb_of_reducer,reducerNum=self.reducerNum, nb_of_mapper=self.nb_of_mapper, filename=self.filename)
 
     def output(self):
-        return luigi.LocalTarget('./data/reduced/reducer_output_{}.txt'.format(self.reducerNum))
+        return luigi.LocalTarget('/app/data/reduced/reducer_output_{}.txt'.format(self.reducerNum))
 
     def run(self):
         word_count = {}
@@ -121,17 +118,17 @@ class Reducer(luigi.Task):
                 outfile.write(f"{word}: {count}\n")
 
 
-class BundleReducerOutput(luigi.Task):
+class BundleReducerOutput(KubernetesJobTask):
     nb_of_reducer = luigi.IntParameter()
     nb_of_mapper = luigi.IntParameter()
     filename = luigi.Parameter()
-
+    
     def requires(self):
         for reducerNum in range(self.nb_of_reducer):
             yield Reducer(nb_of_reducer=self.nb_of_reducer,reducerNum=reducerNum, nb_of_mapper=self.nb_of_mapper, filename=self.filename)
 
     def output(self):
-        return luigi.LocalTarget('bundled_output.txt')
+        return luigi.LocalTarget('/app/data/bundled_output.txt')
 
     def run(self):
         with self.output().open('w') as outfile:
@@ -139,3 +136,7 @@ class BundleReducerOutput(luigi.Task):
                 with input.open('r') as infile:
                     for line in infile:
                         outfile.write(line)
+
+
+if __name__ == '__main__':
+    luigi.build([BundleReducerOutput(nb_of_reducer=3, nb_of_mapper=4, filename='input.txt')], local_scheduler=True)
