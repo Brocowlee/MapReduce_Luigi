@@ -1,4 +1,5 @@
 # MapReduce_Luigi
+Projet made by Joaquim Dos Santos and Arthur Gonay
 
 Image of the _Luigi_ pipelines:
 ![image of the pipelines](f60b1cab-f45e-4fe6-8f19-a34e0511f735.jpg)
